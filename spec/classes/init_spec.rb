@@ -20,8 +20,8 @@ describe 'pam' do
         :releasetype        => 'operatingsystemmajrelease',
         :packages           => ['pam', ],
         :files              => [
-          { :prefix         => 'pam_system_',
-            :types          => ['auth', ],
+          { :prefix         => 'pam_',
+            :types          => ['system_auth', 'password_auth', ],
             :suffix         => '_ac',
             :symlink        => true,
           }, ],
@@ -32,8 +32,8 @@ describe 'pam' do
         :releasetype        => 'operatingsystemmajrelease',
         :packages           => ['pam', ],
         :files              => [
-          { :prefix         => 'pam_system_',
-            :types          => ['auth', ],
+          { :prefix         => 'pam_',
+            :types          => ['system_auth', ],
             :suffix         => '_ac',
             :symlink        => true,
           }, ],
@@ -424,6 +424,68 @@ describe 'pam' do
         end
       end
 
+      context "with password_auth_ac => path on osfamily #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+        let :facts do
+          { :osfamily => v[:osfamily],
+            :"#{v[:releasetype]}" => v[:release],
+            :lsbdistid => v[:lsbdistid],
+          }
+        end
+        if v[:osfamily] == 'RedHat' and v[:release] == '5'
+          it { should_not contain_file('password_auth_ac') }
+        end
+      end
+
+      context "with password_auth_ac_file => path on osfamily #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+        let :facts do
+          { :osfamily => v[:osfamily],
+            :"#{v[:releasetype]}" => v[:release],
+            :lsbdistid => v[:lsbdistid],
+          }
+        end
+        if v[:osfamily] == 'RedHat' and v[:release] == '5'
+          it { should_not contain_file('password_auth_ac_file') }
+        end
+      end
+
+      context "with password_auth_ac_file => invalid/path on osfamily #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+        let :facts do
+          { :osfamily => v[:osfamily],
+            :"#{v[:releasetype]}" => v[:release],
+            :lsbdistid => v[:lsbdistid],
+          }
+        end
+        let(:params) {{ :password_auth_ac_file => 'invalid/path' }}
+
+        if v[:osfamily] == 'RedHat' and (v[:release] == '6' or v[:release] == '7')
+          it 'should fail' do
+            expect {
+              should contain_class('pam')
+            }.to raise_error(Puppet::Error, /"invalid\/path" is not an absolute path/)
+          end
+
+        end
+      end
+
+      context "with password_auth_file => invalid/path on osfamily #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+        let :facts do
+          { :osfamily => v[:osfamily],
+            :"#{v[:releasetype]}" => v[:release],
+            :lsbdistid => v[:lsbdistid],
+          }
+        end
+        let(:params) {{ :password_auth_file => 'invalid/path' }}
+
+        if v[:osfamily] == 'RedHat' and (v[:release] == '6' or v[:release] == '7')
+          it 'should fail' do
+            expect {
+              should contain_class('pam')
+            }.to raise_error(Puppet::Error, /"invalid\/path" is not an absolute path/)
+          end
+
+        end
+      end
+
       context "with ensure_vas => present and vas_major_version => 3 on osfamily #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
         let :facts do
           { :osfamily => v[:osfamily],
@@ -457,6 +519,29 @@ describe 'pam' do
           it { should contain_file('pam_system_auth_ac').with_content(/password[\s]+sufficient[\s]+pam_vas3.so/) }
           it { should contain_file('pam_system_auth_ac').with_content(/session[\s]+required[\s]+pam_vas3.so/) }
         end
+
+        if v[:osfamily] == 'RedHat' and  v[:release] == '6'
+          it {
+            should contain_file('pam_password_auth_ac').with({
+              'ensure'  => 'file',
+              'path'    => '/etc/pam.d/password-auth-ac',
+              'owner'   => 'root',
+              'group'   => 'root',
+              'mode'    => '0644',
+            })
+          }
+
+          v[:packages].sort.each do |pkg|
+            it { should contain_file('pam_password_auth_ac').that_requires("Package[#{pkg}]") }
+          end
+
+          it { should contain_file('pam_password_auth_ac').with_content(/auth[\s]+sufficient[\s]+pam_vas3.so create_homedir get_nonvas_pass/) }
+          it { should contain_file('pam_password_auth_ac').with_content(/account[\s]+sufficient[\s]+pam_vas3.so/) }
+          it { should contain_file('pam_password_auth_ac').with_content(/password[\s]+sufficient[\s]+pam_vas3.so/) }
+          it { should contain_file('pam_password_auth_ac').with_content(/session[\s]+required[\s]+pam_limits.so/) }
+          it { should_not contain_file('pam_password_auth_ac').with_content(/auth[\s]+sufficient[\s]+pam_vas3.so.*store_creds/) }
+        end
+
 
         if v[:osfamily] == 'Debian'
           it { should contain_class('pam::accesslogin') }
@@ -623,7 +708,7 @@ describe 'pam' do
         end
       end
 
-      context "with limits_fragments_hiera_merge prameter specified as an invalid string on #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+      context "with limits_fragments_hiera_merge parameter specified as an invalid string on #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
         let :facts do
           { :osfamily => v[:osfamily],
             :"#{v[:releasetype]}" => v[:release],
@@ -638,7 +723,7 @@ describe 'pam' do
       end
 
       ['true',true,'false',false].each do |value|
-        context "with limits_fragments_hiera_merge prameter specified as a valid value: #{value} on #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
+        context "with limits_fragments_hiera_merge parameter specified as a valid value: #{value} on #{v[:osfamily]} with #{v[:releasetype]} #{v[:release]}" do
           let :facts do
             { :osfamily => v[:osfamily],
               :"#{v[:releasetype]}" => v[:release],
